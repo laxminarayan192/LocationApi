@@ -7,17 +7,12 @@ import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.location.Address;
-import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationManager;
-import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.util.Log;
-import android.widget.Toast;
 
 import com.android.volley.Request;
 import com.android.volley.Response;
@@ -42,12 +37,6 @@ import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.DefaultHttpClient;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -294,155 +283,6 @@ public class LocationRequestApi implements LocationListener, GoogleApiClient.Con
             buildGoogleApiClient();
         return mGoogleApiClient;
     }
-
-    public void getLatLng(String address, final OnReverseGeoCodeResult onReverseGeoCodeResult) {
-        final String lookupStringUriencoded = Uri.encode(address);
-        String url = "http://maps.google.com/maps/api/geocode/json?address="
-                + lookupStringUriencoded + "&sensor=true";
-        Logs.wtf(this, "Url", url);
-        JsonObjectRequest stringRequest = new JsonObjectRequest(Request.Method.GET, url, null,
-                new Response.Listener<JSONObject>() {
-                    @Override
-                    public void onResponse(JSONObject response) {
-                        try {
-                            // Log.d("MAPSAPI", stringBuilder.toString());
-                            JSONObject jsonObject = null;
-                            if (response.getString("status").equals("OK")) {
-                                jsonObject = response.getJSONArray("results")
-                                        .getJSONObject(0);
-                                jsonObject = jsonObject.getJSONObject("geometry");
-                                jsonObject = jsonObject.getJSONObject("location");
-                                String lat = jsonObject.getString("lat");
-                                String lng = jsonObject.getString("lng");
-
-                                LatLng position = new LatLng(Double.valueOf(lat),
-                                        Double.valueOf(lng));
-                                onReverseGeoCodeResult.onReverseGeoCodeResult(position);
-                            }
-
-                        } catch (JSONException e) {
-                            Log.wtf(LocationRequestApi.this + " Geocode", e.getMessage());
-                        }
-                    }
-                },
-                new Response.ErrorListener() {
-                    @Override
-                    public void onErrorResponse(VolleyError error) {
-                        //Logs.wtf(this, " Volley", error.toString() + "\n" + error.getMessage());
-                        //Toast.makeText(Step1Activity.this, error.toString(), Toast.LENGTH_LONG).show();
-                    }
-                });
-
-
-        q.add(stringRequest);
-    }
-
-    public static class GetAddressPositionTask extends AsyncTask<Object, Integer, LatLng> {
-        private static final String TAG = "tag";
-        String lookupString;
-        OnReverseGeoCodeResult geoCodeResult;
-        private Context context;
-
-        @Override
-        protected void onPreExecute() {
-            super.onPreExecute();
-        }
-
-        @Override
-        protected LatLng doInBackground(Object... params) {
-
-            // String lookupString = plookupString[0];
-            this.geoCodeResult = (OnReverseGeoCodeResult) params[2];
-            this.lookupString = (String) params[1];
-            this.context = (Context) params[0];
-
-            final String lookupStringUriencoded = Uri.encode(lookupString);
-            LatLng position = null;
-            Geocoder geocoder = new Geocoder(context);
-            // best effort zoom
-            try {
-                if (geocoder != null) {
-                    List<Address> addresses = geocoder.getFromLocationName(
-                            lookupString, 1);
-                    if (addresses != null && !addresses.isEmpty()) {
-                        Address first_address = addresses.get(0);
-                        position = new LatLng(first_address.getLatitude(),
-                                first_address.getLongitude());
-                    }
-                } else {
-                    Log.e(TAG, "geocoder was null, is the module loaded? "
-                            + "isLoaded");
-                }
-
-            } catch (IOException e) {
-                Log.e(TAG, "geocoder failed, moving on to HTTP");
-            }
-            // try HTTP lookup to the maps API
-            if (position == null) {
-                HttpGet httpGet = new HttpGet(
-                        "http://maps.google.com/maps/api/geocode/json?address="
-                                + lookupStringUriencoded + "&sensor=true");
-                HttpClient client = new DefaultHttpClient();
-                HttpResponse response;
-                StringBuilder stringBuilder = new StringBuilder();
-
-                try {
-                    response = client.execute(httpGet);
-                    HttpEntity entity = response.getEntity();
-                    InputStream stream = entity.getContent();
-                    int b;
-                    while ((b = stream.read()) != -1) {
-                        stringBuilder.append((char) b);
-                    }
-                } catch (ClientProtocolException e) {
-                } catch (IOException e) {
-                }
-
-                JSONObject jsonObject = new JSONObject();
-                try {
-                    // Log.d("MAPSAPI", stringBuilder.toString());
-
-                    jsonObject = new JSONObject(stringBuilder.toString());
-                    if (jsonObject.getString("status").equals("OK")) {
-                        jsonObject = jsonObject.getJSONArray("results")
-                                .getJSONObject(0);
-                        jsonObject = jsonObject.getJSONObject("geometry");
-                        jsonObject = jsonObject.getJSONObject("location");
-                        String lat = jsonObject.getString("lat");
-                        String lng = jsonObject.getString("lng");
-
-                        position = new LatLng(Double.valueOf(lat),
-                                Double.valueOf(lng));
-                    }
-
-                } catch (JSONException e) {
-                    Log.e(TAG, e.getMessage(), e);
-                }
-
-            }
-            return position;
-        }
-
-        @Override
-        protected void onPostExecute(LatLng result) {
-            // use try catch
-            try {
-                Log.wtf("GEOCODE", result.toString());
-                super.onPostExecute(result);
-                if (result.toString().equalsIgnoreCase("null") || result.toString().equalsIgnoreCase("") || result.toString().equalsIgnoreCase(null)) {
-                    Toast.makeText(context, "Some thing went worng try again", Toast.LENGTH_LONG).show();
-
-                } else {
-                    geoCodeResult.onReverseGeoCodeResult(result);
-                }
-            } catch (Exception e) {
-                Logs.wtf(this, "Reverse GeoCode", e.toString());
-                Toast.makeText(context, "Some thing went wrong try again", Toast.LENGTH_LONG).show();
-            }
-        }
-
-    }
-
 
     private synchronized void setPolyLineArray(JSONObject poly) {
         List<LatLng> allPoints = new ArrayList<>();
